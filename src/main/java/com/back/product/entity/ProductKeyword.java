@@ -1,5 +1,6 @@
 package com.back.product.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,7 @@ public class ProductKeyword {
     @ManyToOne(fetch = FetchType.LAZY)
     @Setter
     @Getter
+    @JsonIgnore // Product -> keywords -> product -> keywords ... 무한 반복(순환 참조)을 끊는다
     private Product product;
 
     @Column
