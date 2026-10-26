@@ -90,4 +90,14 @@ class ProductSearchTests {
         assertTrue(similar.stream().noneMatch(p -> p.getId().equals(gamingLaptop.getId())));
         assertEquals("Gaming Mouse", similar.get(0).getName());
     }
+
+    @Test
+    @DisplayName("pgvector 검색 - Elasticsearch KNN과 같은 결과를 낸다")
+    void t6() {
+        List<String> es = productService.knnSearch("gaming", 2).stream().map(Product::getName).toList();
+        List<String> pg = productService.vectorSearch("gaming", 2).stream().map(Product::getName).toList();
+
+        System.out.println("Elasticsearch : " + es + " / pgvector : " + pg);
+        assertEquals(es, pg);
+    }
 }

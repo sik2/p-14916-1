@@ -8,6 +8,12 @@ import com.back.product.repository.ProductRepository;
 import co.elastic.clients.elasticsearch._types.KnnSearch;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.data.domain.Limit;
+import org.springframework.data.domain.Score;
+import org.springframework.data.domain.ScoringFunction;
+import org.springframework.data.domain.SearchResult;
+import org.springframework.data.domain.SearchResults;
+import org.springframework.data.domain.Vector;
 import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.SearchHit;
@@ -38,9 +44,11 @@ public class ProductService {
         Product product = new Product();
         product.setName(name);
         keywords.forEach(product::addKeyword);
+        float[] embedding = embed(keywords);
+        product.setEmbedding(embedding); // pgvector 컬럼에도 저장 (13강에서 Elasticsearch를 대체)
         productRepository.save(product);
 
-        saveDocument(product.getId(), keywords);
+        saveDocument(product.getId(), embedding);
         return product;
     }
 
@@ -64,8 +72,10 @@ public class ProductService {
         product.setName(name);
         product.getKeywords().clear(); // orphanRemoval = true : 컬렉션에서 빠진 키워드는 DELETE 된다
         keywords.forEach(product::addKeyword);
+        float[] embedding = embed(keywords);
+        product.setEmbedding(embedding);
 
-        saveDocument(id, keywords);
+        saveDocument(id, embedding);
         return product;
     }
 
@@ -151,13 +161,29 @@ public class ProductService {
         return list;
     }
 
-    private void saveDocument(Long productId, List<String> keywords) {
+    // 키워드가 없으면 벡터도 없다 (검색 대상에서 빠짐)
+    private float[] embed(List<String> keywords) {
+        return keywords.isEmpty() ? null : calculateAverage(embeddingModel.embed(keywords));
+    }
+
+    private void saveDocument(Long productId, float[] embedding) {
         ProductDocument doc = new ProductDocument();
         doc.setId(productId);
-        if (!keywords.isEmpty()) { // 키워드가 없으면 벡터도 없다 (검색 대상에서 빠짐)
-            doc.setEmbedding(calculateAverage(embeddingModel.embed(keywords)));
-        }
+        doc.setEmbedding(embedding);
         productDocumentRepository.save(doc);
+    }
+
+    // pgvector로 검색 : 코사인 거리가 가까운 순서로 k개 (13강에서 knnSearch를 이 방식으로 바꾼다)
+    public List<Product> vectorSearch(String query, int k) {
+        float[] queryVector = embeddingModel.embed(query);
+        SearchResults<Product> results = productRepository.searchByEmbeddingNear(
+                Vector.of(queryVector),
+                // cosine()의 Score는 "코사인 거리(embedding <=> 쿼리)의 상한"이다. 거리는 0(같음) ~ 2(반대).
+                // 2.0이면 거르지 않고 가까운 순서로 k개를 받는다. 0.5처럼 주면 그보다 먼 상품은 빠진다.
+                Score.of(2.0, ScoringFunction.cosine()),
+                Limit.of(k));
+        results.forEach(r -> System.out.println("  pgvector hit " + r.getContent().getName() + " distance=" + r.getScore().getValue()));
+        return results.stream().map(SearchResult::getContent).toList();
     }
 
     // 키워드마다 만든 벡터를 차원별로 평균 내어 상품 하나를 대표하는 벡터로 만든다
