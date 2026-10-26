@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Profile;
 
 @Configuration
 public class AiConfig {
-    // 저장소(Elasticsearch, pgvector)의 벡터 차원과 반드시 같아야 한다
+    // 저장소(pgvector 컬럼 vector(384))의 벡터 차원과 반드시 같아야 한다
     public static final int EMBEDDING_DIMENSIONS = 384;
 
     // default 프로필에는 OpenAI, Ollama ChatModel이 모두 존재한다.

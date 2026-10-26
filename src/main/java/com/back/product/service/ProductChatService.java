@@ -3,6 +3,8 @@ package com.back.product.service;
 import com.back.product.tool.ProductSearchTool;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -12,6 +14,7 @@ public class ProductChatService {
 
     private final ChatClient chatClient;
     private final ProductSearchTool productSearchTool;
+    private final ChatMemory chatMemory;
 
     private static final String SYSTEM_PROMPT = """
             당신은 친절한 상품 추천 어시스턴트입니다.
@@ -25,13 +28,17 @@ public class ProductChatService {
 
             검색 결과에 있는 상품만 추천하세요. 결과에 없는 상품을 지어내지 마세요.
             상품을 찾지 못한 경우, 사용자에게 알리고 대안적인 검색어를 제안하세요.
+            이전 대화 내용을 기억하고 맥락에 맞는 응답을 제공하세요.
             """;
 
-    public ChatResponse chat(String userMessage) {
+    // conversationId : 대화방 id. 같은 id끼리 이전 대화를 공유한다 (최대 36자, SPRING_AI_CHAT_MEMORY 컬럼 크기)
+    public ChatResponse chat(String userMessage, String conversationId) {
         String response = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
                 .user(userMessage)
                 .tools(productSearchTool) // ProductSearchTool의 모든 @Tool 메서드를 AI가 쓸 수 있게 등록
+                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build()) // 이전 대화를 프롬프트에 붙이고, 이번 대화를 저장
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .content();
 
@@ -39,11 +46,13 @@ public class ProductChatService {
     }
 
     // 토큰이 생성되는 대로 흘려보낸다. 도구 호출은 Spring AI가 boundedElastic 스레드에서 실행한다.
-    public Flux<String> chatStream(String userMessage) {
+    public Flux<String> chatStream(String userMessage, String conversationId) {
         return chatClient.prompt()
                 .system(SYSTEM_PROMPT)
                 .user(userMessage)
                 .tools(productSearchTool)
+                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
                 .content();
     }

@@ -18,6 +18,11 @@ spring:
       hibernate:
         format_sql: true
   ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always # SPRING_AI_CHAT_MEMORY 테이블 자동 생성 (내장 DB가 아니어도)
     openai:
       api-key: ${OPENAI_API_KEY:sk-dummy} # 키가 없어도 기동은 되게 기본값을 둔다 (실제 호출 시 401)
       embedding:
