@@ -29,6 +29,8 @@ dependencies {
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("org.springframework.ai:spring-ai-starter-model-ollama")
     implementation("org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc") // 대화 이력을 DB에 저장
+    implementation("org.springframework.ai:spring-ai-starter-vector-store-chroma") // ChromaDB 벡터 스토어
+    implementation("org.springframework.ai:spring-ai-vector-store-advisor")       // VectorStoreChatMemoryAdvisor (2.0에서 spring-ai-advisors-vector-store가 이름을 바꿈)
     compileOnly("org.projectlombok:lombok")
     runtimeOnly("org.postgresql:postgresql")
     annotationProcessor("org.projectlombok:lombok")
@@ -37,6 +39,8 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:testcontainers-chromadb")
+    testImplementation("org.springframework.ai:spring-ai-spring-boot-testcontainers") // Chroma 컨테이너용 @ServiceConnection
     testCompileOnly("org.projectlombok:lombok")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testAnnotationProcessor("org.projectlombok:lombok")

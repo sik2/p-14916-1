@@ -23,6 +23,13 @@ spring:
         repository:
           jdbc:
             initialize-schema: always # SPRING_AI_CHAT_MEMORY 테이블 자동 생성 (내장 DB가 아니어도)
+    vectorstore:
+      chroma:
+        client:
+          host: http://localhost
+          port: 8000
+        collection-name: chat-memory
+        initialize-schema: true # 컬렉션이 없으면 만든다
     openai:
       api-key: ${OPENAI_API_KEY:sk-dummy} # 키가 없어도 기동은 되게 기본값을 둔다 (실제 호출 시 401)
       embedding:

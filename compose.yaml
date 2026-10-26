@@ -18,6 +18,14 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro # 볼륨이 비어 있을 때만 실행
     restart: unless-stopped
+  chroma:
+    image: chromadb/chroma:1.5.9 # latest 대신 버전 고정 (Chroma는 버전마다 API·저장 경로가 바뀐 적이 있다)
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/data # Chroma 1.x의 저장 경로
+    restart: unless-stopped
 volumes:
   ollama-data:
   postgres-data:
+  chroma-data:

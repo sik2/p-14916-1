@@ -3,10 +3,15 @@ package com.back.product.service;
 import com.back.product.tool.ProductSearchTool;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.VectorStoreChatMemoryAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +20,7 @@ public class ProductChatService {
     private final ChatClient chatClient;
     private final ProductSearchTool productSearchTool;
     private final ChatMemory chatMemory;
+    private final VectorStore vectorStore;
 
     private static final String SYSTEM_PROMPT = """
             당신은 친절한 상품 추천 어시스턴트입니다.
@@ -37,7 +43,7 @@ public class ProductChatService {
                 .system(SYSTEM_PROMPT)
                 .user(userMessage)
                 .tools(productSearchTool) // ProductSearchTool의 모든 @Tool 메서드를 AI가 쓸 수 있게 등록
-                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build()) // 이전 대화를 프롬프트에 붙이고, 이번 대화를 저장
+                .advisors(memoryAdvisors())
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .content();
@@ -51,10 +57,19 @@ public class ProductChatService {
                 .system(SYSTEM_PROMPT)
                 .user(userMessage)
                 .tools(productSearchTool)
-                .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
+                .advisors(memoryAdvisors())
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
                 .content();
+    }
+
+    // 단기 기억 : 최근 메시지 10개를 그대로 붙인다 (JDBC)
+    // 장기 기억 : 지금 질문과 의미가 비슷한 과거 대화를 찾아 시스템 프롬프트에 붙인다 (ChromaDB)
+    private List<Advisor> memoryAdvisors() {
+        return List.of(
+                MessageChatMemoryAdvisor.builder(chatMemory).build(),
+                VectorStoreChatMemoryAdvisor.builder(vectorStore).defaultTopK(3).build()
+        );
     }
 
     public record ChatResponse(String message) {}

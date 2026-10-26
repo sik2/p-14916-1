@@ -3,6 +3,7 @@ package com.back;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.testcontainers.chromadb.ChromaDBContainer;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -16,5 +17,11 @@ public class TestcontainersConfiguration {
                 .parse("pgvector/pgvector:pg17")              // pgvector 확장이 들어 있는 PostgreSQL 17
                 .asCompatibleSubstituteFor("postgres"))
                 .withInitScript("init-pgvector.sql");          // 시작 시 CREATE EXTENSION vector 실행
+    }
+
+    @Bean
+    @ServiceConnection // spring.ai.vectorstore.chroma.client.* 를 대신 채워 준다 (spring-ai-spring-boot-testcontainers 필요)
+    ChromaDBContainer chromaContainer() {
+        return new ChromaDBContainer(DockerImageName.parse("chromadb/chroma:1.5.9"));
     }
 }
