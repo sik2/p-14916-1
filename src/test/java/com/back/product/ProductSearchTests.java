@@ -2,7 +2,6 @@ package com.back.product;
 
 import com.back.TestcontainersConfiguration;
 import com.back.product.entity.Product;
-import com.back.product.repository.ProductDocumentRepository;
 import com.back.product.repository.ProductRepository;
 import com.back.product.service.ProductService;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.util.List;
@@ -26,23 +24,16 @@ class ProductSearchTests {
     private ProductService productService;
     @Autowired
     private ProductRepository productRepository;
-    @Autowired
-    private ProductDocumentRepository productDocumentRepository;
-    @Autowired
-    private ElasticsearchOperations elasticsearchOperations;
 
     // 테스트 클래스들이 같은 컨테이너를 공유하므로, 검색 결과가 섞이지 않게 비우고 시작한다
     @BeforeEach
     void setUp() {
-        productDocumentRepository.deleteAll();
         productRepository.deleteAll();
 
         productService.create("Gaming Laptop", List.of("gaming", "laptop", "graphics-card"));
         productService.create("Business Laptop", List.of("office", "document", "lightweight"));
         productService.create("Gaming Mouse", List.of("gaming", "mouse", "RGB"));
         productService.create("Espresso Coffee", List.of("coffee", "espresso", "beverage"));
-
-        elasticsearchOperations.indexOps(com.back.product.document.ProductDocument.class).refresh(); // 방금 넣은 문서를 바로 검색 가능하게
     }
 
     @Test
@@ -89,15 +80,5 @@ class ProductSearchTests {
         assertEquals(2, similar.size());
         assertTrue(similar.stream().noneMatch(p -> p.getId().equals(gamingLaptop.getId())));
         assertEquals("Gaming Mouse", similar.get(0).getName());
-    }
-
-    @Test
-    @DisplayName("pgvector 검색 - Elasticsearch KNN과 같은 결과를 낸다")
-    void t6() {
-        List<String> es = productService.knnSearch("gaming", 2).stream().map(Product::getName).toList();
-        List<String> pg = productService.vectorSearch("gaming", 2).stream().map(Product::getName).toList();
-
-        System.out.println("Elasticsearch : " + es + " / pgvector : " + pg);
-        assertEquals(es, pg);
     }
 }

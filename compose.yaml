@@ -18,18 +18,6 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-pgvector.sql:/docker-entrypoint-initdb.d/init-pgvector.sql:ro # 볼륨이 비어 있을 때만 실행
     restart: unless-stopped
-  elasticsearch:
-    image: elasticsearch:9.2.3
-    environment:
-      - discovery.type=single-node # 클러스터 없이 노드 하나로 실행
-      - xpack.security.enabled=false # 로컬 개발용 : 인증·HTTPS 끔
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m # 메모리 사용량 제한
-    ports:
-      - "9200:9200"
-    volumes:
-      - es-data:/usr/share/elasticsearch/data
-    restart: unless-stopped
 volumes:
   ollama-data:
   postgres-data:
-  es-data:
