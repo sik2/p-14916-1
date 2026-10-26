@@ -69,4 +69,25 @@ class ProductSearchTests {
     void t3() {
         assertEquals(3, productService.knnSearch("computer", 3).size());
     }
+
+    @Test
+    @DisplayName("키워드 목록 검색 - 여러 키워드의 평균 벡터로 찾는다")
+    void t4() {
+        List<Product> results = productService.knnSearch(List.of("coffee", "espresso"), 1);
+
+        assertEquals("Espresso Coffee", results.get(0).getName());
+    }
+
+    @Test
+    @DisplayName("유사 상품 - 기준 상품 자신은 빠지고, 가장 비슷한 상품이 1위다")
+    void t5() {
+        Product gamingLaptop = productRepository.findAll().iterator().next(); // setUp에서 첫 번째로 만든 Gaming Laptop
+
+        List<Product> similar = productService.findSimilarProducts(gamingLaptop.getId(), 2);
+
+        System.out.println("Gaming Laptop 유사 상품 : " + similar.stream().map(Product::getName).toList());
+        assertEquals(2, similar.size());
+        assertTrue(similar.stream().noneMatch(p -> p.getId().equals(gamingLaptop.getId())));
+        assertEquals("Gaming Mouse", similar.get(0).getName());
+    }
 }

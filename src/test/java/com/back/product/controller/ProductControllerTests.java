@@ -89,4 +89,29 @@ class ProductControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/products/{id}/similar - 유사 상품 조회, 자기 자신 제외")
+    void t6() throws Exception {
+        Product laptop = productService.create("MacBook Pro", List.of("laptop", "apple", "development"));
+        productService.create("iPhone 15", List.of("smartphone", "apple", "communication"));
+        productService.create("iPad Pro", List.of("tablet", "apple", "drawing"));
+
+        mockMvc.perform(get("/api/v1/products/{id}/similar", laptop.getId()).param("k", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].name", not(hasItem("MacBook Pro"))));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/products/search - 키워드 목록으로 검색")
+    void t7() throws Exception {
+        mockMvc.perform(post("/api/v1/products/search")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"keywords": ["apple", "laptop"], "k": 2}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(lessThanOrEqualTo(2))));
+    }
 }

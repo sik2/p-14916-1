@@ -56,7 +56,25 @@ public class ProductController {
         return ResponseEntity.ok(productService.knnSearch(query, k));
     }
 
+    @PostMapping("/search")
+    public ResponseEntity<List<Product>> searchByKeywords(@RequestBody SearchRequest request) {
+        return ResponseEntity.ok(productService.knnSearch(request.keywords(), request.k()));
+    }
+
+    @GetMapping("/{id}/similar")
+    public ResponseEntity<List<Product>> findSimilarProducts(@PathVariable Long id, @RequestParam(defaultValue = "5") int k) {
+        if (productService.findById(id).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(productService.findSimilarProducts(id, k));
+    }
+
     // ==================== Request DTOs ====================
     public record CreateRequest(String name, List<String> keywords) {}
     public record UpdateRequest(String name, List<String> keywords) {}
+    public record SearchRequest(List<String> keywords, int k) {
+        public SearchRequest {
+            if (k <= 0) k = 10; // k를 보내지 않으면 0 → 기본값 10
+        }
+    }
 }
