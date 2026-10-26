@@ -4,6 +4,7 @@ import com.back.product.tool.ProductSearchTool;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +36,16 @@ public class ProductChatService {
                 .content();
 
         return new ChatResponse(response);
+    }
+
+    // 토큰이 생성되는 대로 흘려보낸다. 도구 호출은 Spring AI가 boundedElastic 스레드에서 실행한다.
+    public Flux<String> chatStream(String userMessage) {
+        return chatClient.prompt()
+                .system(SYSTEM_PROMPT)
+                .user(userMessage)
+                .tools(productSearchTool)
+                .stream()
+                .content();
     }
 
     public record ChatResponse(String message) {}

@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
 
@@ -128,5 +129,24 @@ class ProductControllerTests {
                 .andDo(print())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").isString());
+    }
+
+    @Test
+    @DisplayName("GET /api/v1/products/chat/stream - SSE 스트리밍, 토큰이 JSON으로 온다")
+    void t9() throws Exception {
+        productService.create("Gaming Laptop", List.of("gaming", "laptop", "high-performance"));
+
+        MvcResult result = mockMvc.perform(get("/api/v1/products/chat/stream")
+                        .param("message", "I need a laptop for gaming")
+                        .accept(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(request().asyncStarted()) // SseEmitter를 반환하면 비동기 요청이 시작된다
+                .andReturn();
+
+        result.getAsyncResult(120_000); // 스트림이 끝날 때까지 기다린다 (최대 120초)
+        String body = result.getResponse().getContentAsString();
+        System.out.println("SSE 응답 앞부분 : " + body.substring(0, Math.min(300, body.length())));
+
+        org.junit.jupiter.api.Assertions.assertTrue(body.contains("event:message"));
+        org.junit.jupiter.api.Assertions.assertTrue(body.contains("data:{\"content\":"));
     }
 }

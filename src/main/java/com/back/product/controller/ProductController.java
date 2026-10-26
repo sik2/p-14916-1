@@ -4,9 +4,13 @@ import com.back.product.entity.Product;
 import com.back.product.service.ProductChatService;
 import com.back.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
 
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -77,10 +81,36 @@ public class ProductController {
         return ResponseEntity.ok(productChatService.chat(request.message()));
     }
 
+    @GetMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStream(@RequestParam String message) {
+        SseEmitter emitter = new SseEmitter(0L); // 0 : 서버 쪽 타임아웃 없음
+
+        Disposable subscription = productChatService.chatStream(message).subscribe(
+                token -> {
+                    try {
+                        // 토큰을 JSON({"content":" How"})으로 보내야 앞 공백이 사라지지 않는다
+                        emitter.send(SseEmitter.event().name("message").data(new ChatChunk(token), MediaType.APPLICATION_JSON));
+                    } catch (IOException e) {
+                        emitter.completeWithError(e);
+                    }
+                },
+                emitter::completeWithError, // 스트림 에러
+                emitter::complete           // 스트림 정상 종료
+        );
+
+        // 클라이언트가 연결을 끊으면 LLM 스트림 구독도 끊는다 (안 끊으면 답변 끝까지 토큰을 계속 소비)
+        emitter.onCompletion(subscription::dispose);
+        emitter.onTimeout(subscription::dispose);
+        emitter.onError(e -> subscription.dispose());
+
+        return emitter;
+    }
+
     // ==================== Request DTOs ====================
     public record CreateRequest(String name, List<String> keywords) {}
     public record UpdateRequest(String name, List<String> keywords) {}
     public record ChatRequest(String message) {}
+    public record ChatChunk(String content) {}
     public record SearchRequest(List<String> keywords, int k) {
         public SearchRequest {
             if (k <= 0) k = 10; // k를 보내지 않으면 0 → 기본값 10
