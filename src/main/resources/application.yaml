@@ -1,6 +1,9 @@
 spring:
   application:
     name: p-14916-1
+  autoconfigure:
+    # default 프로필 : 임베딩은 OpenAI만 사용 (Ollama 임베딩 자동 설정 제외)
+    exclude: org.springframework.ai.model.ollama.autoconfigure.OllamaEmbeddingAutoConfiguration
   config:
     import: optional:file:.env[.properties]
   datasource:
@@ -14,3 +17,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-dummy} # 키가 없어도 기동은 되게 기본값을 둔다 (실제 호출 시 401)
+      embedding:
+        model: text-embedding-3-small # 기본값(ada-002)은 차원 축소(dimensions)를 지원하지 않는다
+        dimensions: 384
