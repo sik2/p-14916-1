@@ -114,4 +114,19 @@ class ProductControllerTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(lessThanOrEqualTo(2))));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/products/chat - 채팅으로 상품 추천 요청")
+    void t8() throws Exception {
+        productService.create("Gaming Laptop", List.of("gaming", "laptop", "high-performance"));
+
+        mockMvc.perform(post("/api/v1/products/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"message": "I need a laptop for gaming. Can you recommend something?"}
+                                """))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").isString());
+    }
 }
