@@ -4,13 +4,23 @@ import com.back.product.document.ProductDocument;
 import com.back.product.entity.Product;
 import com.back.product.repository.ProductDocumentRepository;
 import com.back.product.repository.ProductRepository;
+import co.elastic.clients.elasticsearch._types.KnnSearch;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.data.elasticsearch.client.elc.ElasticsearchTemplate;
+import org.springframework.data.elasticsearch.client.elc.NativeQuery;
+import org.springframework.data.elasticsearch.core.SearchHit;
+import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 @Service
@@ -19,6 +29,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final ProductDocumentRepository productDocumentRepository;
     private final EmbeddingModel embeddingModel;
+    private final ElasticsearchTemplate elasticsearchTemplate;
 
     // 1) PostgreSQL에 상품 저장 → 2) 키워드 임베딩 → 3) Elasticsearch에 벡터 저장
     // 두 저장소는 하나의 트랜잭션으로 묶이지 않는다. 3)이 실패하면 "DB에는 있지만 검색되지 않는 상품"이 생긴다.
@@ -61,6 +72,56 @@ public class ProductService {
     public void delete(Long id) {
         productRepository.deleteById(id);
         productDocumentRepository.deleteById(id);
+    }
+
+    // 검색어를 임베딩해서, 벡터가 가장 가까운 상품 k개를 유사도 순으로 돌려준다
+    public List<Product> knnSearch(String query, int k) {
+        float[] queryVector = embeddingModel.embed(query);
+        return findProductsByVector(queryVector, k);
+    }
+
+    private List<Product> findProductsByVector(float[] queryVector, int k) {
+        List<Long> ids = knnSearchByVector(queryVector, k, k * 2).stream()
+                .map(ProductDocument::getId)
+                .toList();
+
+        // findAllById는 순서를 보장하지 않는다. KNN이 돌려준 id 순서(유사도 순)대로 다시 정렬한다.
+        Map<Long, Product> productMap = StreamSupport
+                .stream(productRepository.findAllById(ids).spliterator(), false)
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        return ids.stream()
+                .map(productMap::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private List<ProductDocument> knnSearchByVector(float[] queryVector, int k, int numCandidates) {
+        KnnSearch knnSearch = KnnSearch.of(knn -> knn
+                .field("embedding")
+                .queryVector(toFloatList(queryVector)) // Elasticsearch 클라이언트는 List<Float>를 받는다
+                .k(k)                                  // 최종으로 돌려받을 개수
+                .numCandidates(numCandidates)          // 샤드마다 살펴볼 후보 수 (클수록 정확, 느림)
+        );
+
+        NativeQuery query = NativeQuery.builder()
+                .withKnnSearches(knnSearch)
+                .build();
+
+        SearchHits<ProductDocument> searchHits = elasticsearchTemplate.search(query, ProductDocument.class);
+        searchHits.getSearchHits().forEach(hit ->
+                System.out.println("  KNN hit id=" + hit.getContent().getId() + " score=" + hit.getScore()));
+        return searchHits.getSearchHits().stream()
+                .map(SearchHit::getContent)
+                .toList();
+    }
+
+    private List<Float> toFloatList(float[] array) {
+        List<Float> list = new ArrayList<>(array.length);
+        for (float v : array) {
+            list.add(v);
+        }
+        return list;
     }
 
     private void saveDocument(Long productId, List<String> keywords) {
